@@ -17,8 +17,12 @@ export interface AppConfig {
 
 function getEnv(name: string, required: boolean = true): string | undefined {
   const value = process.env[name];
-  if (required && !value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+  if (!value && required) {
+    // In packaged desktop builds the environment may be partially missing.
+    // Log a clear error instead of throwing so the UI can still start.
+    // Downstream callers should handle empty/undefined values gracefully.
+    // eslint-disable-next-line no-console
+    console.error(`Missing required environment variable: ${name}`);
   }
   return value;
 }
@@ -26,7 +30,7 @@ function getEnv(name: string, required: boolean = true): string | undefined {
 export function loadConfig(): AppConfig {
   const swiBaseUrl = getEnv("SWI_BASE_URL") || "http://localhost:3001"; // default for local development
 
-  const apiKey = getEnv("SCAN_APP_API_KEY")!;
+  const apiKey = getEnv("SCAN_APP_API_KEY") || "";
 
   const desktopAppVersion = getEnv("DESKTOP_APP_VERSION", false);
 

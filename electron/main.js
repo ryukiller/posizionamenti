@@ -587,16 +587,44 @@ function sendLog(message) {
   }
 }
 
-app.whenReady().then(() => {
-  setupCore();
-  setupIpc();
-  createWindow();
+function logStartupError(error) {
+  try {
+    const userDataDir = app.getPath("userData");
+    const logFile = path.join(userDataDir, "startup-error.log");
+    const message =
+      `[${new Date().toISOString()}] ` +
+      (error instanceof Error ? `${error.name}: ${error.message}\n${error.stack || ""}` : String(error));
+    fs.mkdirSync(userDataDir, { recursive: true });
+    fs.appendFileSync(logFile, message + "\n\n");
+  } catch {
+    // If logging fails, we can't do much else here
+  }
+}
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+app.whenReady().then(() => {
+  try {
+    setupCore();
+    setupIpc();
+    createWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    logStartupError(error);
+    const message =
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    try {
+      dialog.showErrorBox(
+        "Errore di avvio Posizionamenti",
+        `${message}\n\nControlla il file startup-error.log nella cartella dati dell'applicazione per maggiori dettagli.`,
+      );
+    } finally {
+      app.quit();
     }
-  });
+  }
 });
 
 app.on("window-all-closed", () => {
