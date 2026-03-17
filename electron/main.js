@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
@@ -506,6 +506,27 @@ function setupIpc() {
   });
 
   ipcMain.handle("update:check", async () => {
+    // On macOS we don't use automatic in-app updates, since that
+    // requires paid Apple Developer signing. Instead, open the
+    // GitHub Releases page so the user can download manually.
+    if (process.platform === "darwin") {
+      try {
+        const releasesUrl =
+          "https://github.com/ryukiller/posizionamenti/releases/latest";
+        await shell.openExternal(releasesUrl);
+        sendLog(
+          "Aggiornamenti macOS: apertura pagina GitHub Releases per scaricare la nuova versione.",
+        );
+        return { success: true, urlOpened: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        sendLog(
+          `Errore aprendo la pagina GitHub Releases per aggiornamento macOS: ${message}`,
+        );
+        return { success: false, error: message };
+      }
+    }
+
     if (updateCheckInProgress) {
       return { success: false, error: "Controllo aggiornamenti già in corso." };
     }
