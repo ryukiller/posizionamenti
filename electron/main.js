@@ -281,9 +281,6 @@ function setupCore() {
     if (userSettingsCache.apiKey) {
       configCache.apiKey = userSettingsCache.apiKey;
     }
-    if (userSettingsCache.githubToken) {
-      process.env.GH_TOKEN = userSettingsCache.githubToken;
-    }
   }
   const usePlaywright =
     process.env.SCANNER_ENGINE === "playwright" ||
@@ -518,19 +515,6 @@ function setupIpc() {
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const hasGithubToken =
-        !!(userSettingsCache && userSettingsCache.githubToken);
-      const looksLikePrivateRepo404 =
-        message.includes("releases.atom") && message.includes("404");
-
-      if (!hasGithubToken && looksLikePrivateRepo404) {
-        // Repository privato senza token: errore atteso, non logghiamo dettagli tecnici.
-        return {
-          success: false,
-          errorCode: "missing-github-token",
-        };
-      }
-
       sendLog(`Errore controllando aggiornamenti: ${message}`);
       return { success: false, error: message };
     } finally {

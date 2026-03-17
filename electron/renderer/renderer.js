@@ -32,9 +32,6 @@ const settingsBackendBaseUrlInput = document.getElementById(
   "settingsBackendBaseUrlInput",
 );
 const settingsApiKeyInput = document.getElementById("settingsApiKeyInput");
-const settingsGithubTokenInput = document.getElementById(
-  "settingsGithubTokenInput",
-);
 const settingsErrorEl = document.getElementById("settingsError");
 const settingsCancelBtn = document.getElementById("settingsCancelBtn");
 const settingsSaveBtn = document.getElementById("settingsSaveBtn");
@@ -104,9 +101,6 @@ function openSettingsModal() {
   if (settingsApiKeyInput) {
     settingsApiKeyInput.value = userSettings.apiKey || "";
   }
-  if (settingsGithubTokenInput) {
-    settingsGithubTokenInput.value = userSettings.githubToken || "";
-  }
   if (settingsErrorEl) {
     settingsErrorEl.textContent = "";
   }
@@ -142,10 +136,6 @@ async function handleSaveSettings() {
   if (settingsApiKeyInput) {
     const value = settingsApiKeyInput.value.trim();
     payload.apiKey = value || null;
-  }
-  if (settingsGithubTokenInput) {
-    const value = settingsGithubTokenInput.value.trim();
-    payload.githubToken = value || null;
   }
   try {
     const result = await window.posizionamenti.updateUserSettings(payload);
@@ -267,18 +257,11 @@ function ensureUpdateBanner() {
         try {
           const result = await window.posizionamenti.checkForUpdates();
           if (!result || !result.success) {
-            if (result && result.errorCode === "missing-github-token") {
-              appendLog(
-                "Per controllare gli aggiornamenti automatici su un repository GitHub privato è necessario impostare un token GitHub nelle Impostazioni.",
-                true,
-              );
-            } else {
-              appendLog(
-                `Errore durante la ricerca aggiornamenti: ${result && result.error ? result.error : "errore sconosciuto"
-                }`,
-                true,
-              );
-            }
+            appendLog(
+              `Errore durante la ricerca aggiornamenti: ${result && result.error ? result.error : "errore sconosciuto"
+              }`,
+              true,
+            );
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
