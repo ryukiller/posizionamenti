@@ -17,6 +17,7 @@ function getDefaultUserSettings() {
     language: "auto", // 'auto' | 'it' | 'en'
     backendBaseUrl: null,
     apiKey: null,
+    githubToken: null,
   };
 }
 
@@ -97,6 +98,17 @@ function validateUserSettings(partial) {
       result.apiKey = key.trim();
     } else {
       throw new Error("API key non valida.");
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partial, "githubToken")) {
+    const token = partial.githubToken;
+    if (token === null || token === "" || token === undefined) {
+      result.githubToken = null;
+    } else if (typeof token === "string") {
+      result.githubToken = token.trim();
+    } else {
+      throw new Error("Token GitHub non valido.");
     }
   }
 

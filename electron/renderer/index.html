@@ -627,6 +627,23 @@
               Chiave API dell'app desktop configurata nella webapp SWI.
             </p>
           </div>
+          <div class="settings-field">
+            <label for="settingsGithubTokenInput"
+              >Token GitHub (per aggiornamenti automatici su repo
+              privati)</label
+            >
+            <input
+              id="settingsGithubTokenInput"
+              type="text"
+              placeholder="Token personale GitHub con accesso in sola lettura al repo"
+            />
+            <p class="helper">
+              Facoltativo. Se il repository è privato, inserisci un token GitHub
+              con permessi di sola lettura al repository
+              <code>ryukiller/posizionamenti</code> per abilitare il controllo
+              aggiornamenti automatico.
+            </p>
+          </div>
           <div id="settingsError" class="settings-error"></div>
           <div class="settings-actions">
             <button
