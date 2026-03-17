@@ -58,6 +58,7 @@
     "appId": "com.swi.posizionamenti",
     "productName": "Posizionamenti",
     "files": [
+      "out/**/*",
       "dist/**/*",
       "electron/**/*",
       "package.json"
