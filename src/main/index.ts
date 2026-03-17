@@ -283,9 +283,10 @@ function applyUserSettingsToConfig(): void {
 
 function setupCore(): void {
   applyUserSettingsToConfig();
-  const usePlaywright =
-    process.env.SCANNER_ENGINE === "playwright" ||
-    process.env.NODE_ENV === "production";
+  // Di default usiamo sempre Playwright nello scanner desktop.
+  // Lo StubScanner viene usato solo se SCANNER_ENGINE è impostato esplicitamente a "stub".
+  const engine = process.env.SCANNER_ENGINE || "playwright";
+  const usePlaywright = engine !== "stub";
   const scannerOptions: any = {};
   if (userSettingsCache) {
     const browser = userSettingsCache.browser as string | null | undefined;
