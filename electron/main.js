@@ -269,6 +269,16 @@ function setupCore() {
   if (!userSettingsCache) {
     userSettingsCache = loadUserSettings();
   }
+  if (userSettingsCache) {
+    // Allow overriding backend config from UI settings so the packaged app
+    // does not depend on environment variables.
+    if (userSettingsCache.backendBaseUrl) {
+      configCache.swiBaseUrl = userSettingsCache.backendBaseUrl;
+    }
+    if (userSettingsCache.apiKey) {
+      configCache.apiKey = userSettingsCache.apiKey;
+    }
+  }
   const usePlaywright =
     process.env.SCANNER_ENGINE === "playwright" ||
     process.env.NODE_ENV === "production";

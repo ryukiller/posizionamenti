@@ -28,6 +28,10 @@ const settingsShowBrowserCheckbox = document.getElementById(
   "settingsShowBrowserCheckbox",
 );
 const settingsLanguageSelect = document.getElementById("settingsLanguageSelect");
+const settingsBackendBaseUrlInput = document.getElementById(
+  "settingsBackendBaseUrlInput",
+);
+const settingsApiKeyInput = document.getElementById("settingsApiKeyInput");
 const settingsErrorEl = document.getElementById("settingsError");
 const settingsCancelBtn = document.getElementById("settingsCancelBtn");
 const settingsSaveBtn = document.getElementById("settingsSaveBtn");
@@ -67,6 +71,8 @@ function openSettingsModal() {
       browserProfileDir: null,
       headless: false,
       language: "auto",
+      backendBaseUrl: null,
+      apiKey: null,
     };
   }
   if (settingsBrowserSelect) {
@@ -81,6 +87,12 @@ function openSettingsModal() {
   }
   if (settingsLanguageSelect) {
     settingsLanguageSelect.value = userSettings.language || "auto";
+  }
+  if (settingsBackendBaseUrlInput) {
+    settingsBackendBaseUrlInput.value = userSettings.backendBaseUrl || "";
+  }
+  if (settingsApiKeyInput) {
+    settingsApiKeyInput.value = userSettings.apiKey || "";
   }
   if (settingsErrorEl) {
     settingsErrorEl.textContent = "";
@@ -109,6 +121,14 @@ async function handleSaveSettings() {
   }
   if (settingsLanguageSelect) {
     payload.language = settingsLanguageSelect.value || "auto";
+  }
+  if (settingsBackendBaseUrlInput) {
+    const value = settingsBackendBaseUrlInput.value.trim();
+    payload.backendBaseUrl = value || null;
+  }
+  if (settingsApiKeyInput) {
+    const value = settingsApiKeyInput.value.trim();
+    payload.apiKey = value || null;
   }
   try {
     const result = await window.posizionamenti.updateUserSettings(payload);

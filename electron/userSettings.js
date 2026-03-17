@@ -15,6 +15,8 @@ function getDefaultUserSettings() {
     browserProfileDir: null,
     headless: false,
     language: "auto", // 'auto' | 'it' | 'en'
+    backendBaseUrl: null,
+    apiKey: null,
   };
 }
 
@@ -74,6 +76,28 @@ function validateUserSettings(partial) {
       throw new Error("Lingua non valida.");
     }
     result.language = partial.language;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partial, "backendBaseUrl")) {
+    const url = partial.backendBaseUrl;
+    if (url === null || url === "" || url === undefined) {
+      result.backendBaseUrl = null;
+    } else if (typeof url === "string") {
+      result.backendBaseUrl = url.trim();
+    } else {
+      throw new Error("URL backend non valido.");
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(partial, "apiKey")) {
+    const key = partial.apiKey;
+    if (key === null || key === "" || key === undefined) {
+      result.apiKey = null;
+    } else if (typeof key === "string") {
+      result.apiKey = key.trim();
+    } else {
+      throw new Error("API key non valida.");
+    }
   }
 
   return result;

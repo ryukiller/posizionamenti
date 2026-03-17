@@ -602,6 +602,31 @@
               <option value="en">Inglese</option>
             </select>
           </div>
+          <div class="settings-field">
+            <label for="settingsBackendBaseUrlInput"
+              >URL backend SWI (SWI_BASE_URL)</label
+            >
+            <input
+              id="settingsBackendBaseUrlInput"
+              type="text"
+              placeholder="Es. https://app.swi.it"
+            />
+            <p class="helper">
+              Indirizzo base dell'API SWI che fornisce clienti, keyword e
+              accetta i risultati delle scansioni.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label for="settingsApiKeyInput">API key (SCAN_APP_API_KEY)</label>
+            <input
+              id="settingsApiKeyInput"
+              type="text"
+              placeholder="Incolla qui la chiave API"
+            />
+            <p class="helper">
+              Chiave API dell'app desktop configurata nella webapp SWI.
+            </p>
+          </div>
           <div id="settingsError" class="settings-error"></div>
           <div class="settings-actions">
             <button
