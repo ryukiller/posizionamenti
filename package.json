@@ -9,7 +9,7 @@
     "dev:cli": "ts-node src/cli.ts run-once",
     "dev:cli:loop": "ts-node src/cli.ts run-loop",
     "electron:dev": "npm run build && electron electron/main.js",
-    "electron:build": "npm run build && electron-builder",
+    "electron:build": "npm run build && electron-builder --publish=never",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -45,7 +45,6 @@
     },
     "win": {
       "target": "nsis"
-    },
-    "publish": "never"
+    }
   }
 }
