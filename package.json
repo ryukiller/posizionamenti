@@ -1,6 +1,6 @@
 {
   "name": "posizionamenti",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "App desktop cross-platform (macOS e Windows) per verificare le posizioni sui motori di ricerca (Google). L'app scarica dalla webapp la lista di clienti/domini/keyword, esegue ricerche in browser visibile con Playwright, rileva la posizione del dominio target nella SERP, salva screenshot annotati e invia i risultati all'API backend.",
   "main": "electron/main.js",
   "scripts": {
