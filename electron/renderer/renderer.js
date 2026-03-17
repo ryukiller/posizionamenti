@@ -36,6 +36,13 @@ const settingsErrorEl = document.getElementById("settingsError");
 const settingsCancelBtn = document.getElementById("settingsCancelBtn");
 const settingsSaveBtn = document.getElementById("settingsSaveBtn");
 
+const updateBannerContainerId = "updateBannerContainer";
+let updateState = {
+  availableVersion: null,
+  downloadInProgress: false,
+  downloaded: false,
+};
+
 let clientsData = [];
 let sidebarLoadFailedOnce = false;
 let clientFilter = "";
@@ -181,6 +188,195 @@ function appendLog(message, isError) {
   line.textContent = `[${timestamp}] ${message}`;
   logEl.appendChild(line);
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function ensureUpdateBanner() {
+  let container = document.getElementById(updateBannerContainerId);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = updateBannerContainerId;
+    container.style.position = "fixed";
+    container.style.bottom = "16px";
+    container.style.right = "16px";
+    container.style.zIndex = "9999";
+    container.style.maxWidth = "360px";
+    container.style.background = "#111827";
+    container.style.color = "#f9fafb";
+    container.style.padding = "12px 16px";
+    container.style.borderRadius = "8px";
+    container.style.boxShadow = "0 10px 15px -3px rgba(15,23,42,0.3)";
+    container.style.fontSize = "13px";
+    container.style.display = "none";
+
+    const textEl = document.createElement("div");
+    textEl.id = "updateBannerText";
+    textEl.style.marginBottom = "8px";
+    container.appendChild(textEl);
+
+    const actionsRow = document.createElement("div");
+    actionsRow.style.display = "flex";
+    actionsRow.style.gap = "8px";
+
+    const primaryBtn = document.createElement("button");
+    primaryBtn.id = "updateBannerPrimaryBtn";
+    primaryBtn.type = "button";
+    primaryBtn.style.padding = "6px 10px";
+    primaryBtn.style.borderRadius = "6px";
+    primaryBtn.style.border = "none";
+    primaryBtn.style.cursor = "pointer";
+    primaryBtn.style.background = "#2563eb";
+    primaryBtn.style.color = "#f9fafb";
+    primaryBtn.style.fontSize = "12px";
+
+    const secondaryBtn = document.createElement("button");
+    secondaryBtn.id = "updateBannerSecondaryBtn";
+    secondaryBtn.type = "button";
+    secondaryBtn.style.padding = "6px 10px";
+    secondaryBtn.style.borderRadius = "6px";
+    secondaryBtn.style.border = "1px solid #4b5563";
+    secondaryBtn.style.cursor = "pointer";
+    secondaryBtn.style.background = "transparent";
+    secondaryBtn.style.color = "#e5e7eb";
+    secondaryBtn.style.fontSize = "12px";
+
+    actionsRow.appendChild(primaryBtn);
+    actionsRow.appendChild(secondaryBtn);
+    container.appendChild(actionsRow);
+
+    document.body.appendChild(container);
+
+    secondaryBtn.addEventListener("click", () => {
+      container.style.display = "none";
+    });
+
+    primaryBtn.addEventListener("click", async () => {
+      if (!window.posizionamenti) return;
+      const state = updateState;
+      if (!state.availableVersion) {
+        // manual check
+        try {
+          const result = await window.posizionamenti.checkForUpdates();
+          if (!result || !result.success) {
+            appendLog(
+              `Errore durante la ricerca aggiornamenti: ${result && result.error ? result.error : "errore sconosciuto"
+              }`,
+              true,
+            );
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          appendLog(`Errore durante la ricerca aggiornamenti: ${message}`, true);
+        }
+        return;
+      }
+
+      if (!state.downloaded) {
+        appendLog("Download aggiornamento già in corso o gestito automaticamente.", false);
+        return;
+      }
+
+      try {
+        const result = await window.posizionamenti.installUpdate();
+        if (!result || !result.success) {
+          appendLog(
+            `Errore installando l'aggiornamento: ${result && result.error ? result.error : "errore sconosciuto"
+            }`,
+            true,
+          );
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        appendLog(`Errore installando l'aggiornamento: ${message}`, true);
+      }
+    });
+  }
+  return container;
+}
+
+function showUpdateStatusBanner(text) {
+  const container = ensureUpdateBanner();
+  const textEl = document.getElementById("updateBannerText");
+  const primaryBtn = document.getElementById("updateBannerPrimaryBtn");
+  const secondaryBtn = document.getElementById("updateBannerSecondaryBtn");
+  if (!container || !textEl || !primaryBtn || !secondaryBtn) return;
+
+  textEl.textContent = text;
+  primaryBtn.textContent = "Controlla aggiornamenti";
+  secondaryBtn.textContent = "Chiudi";
+  updateState.availableVersion = null;
+  updateState.downloadInProgress = false;
+  updateState.downloaded = false;
+  container.style.display = "block";
+}
+
+function showUpdateAvailableBanner(version) {
+  const container = ensureUpdateBanner();
+  const textEl = document.getElementById("updateBannerText");
+  const primaryBtn = document.getElementById("updateBannerPrimaryBtn");
+  const secondaryBtn = document.getElementById("updateBannerSecondaryBtn");
+  if (!container || !textEl || !primaryBtn || !secondaryBtn) return;
+
+  textEl.textContent = version
+    ? `È disponibile una nuova versione (${version}). Il download inizierà automaticamente.`
+    : "È disponibile una nuova versione. Il download inizierà automaticamente.";
+  primaryBtn.textContent = "In attesa del download...";
+  primaryBtn.disabled = true;
+  secondaryBtn.textContent = "Chiudi";
+  secondaryBtn.disabled = false;
+
+  updateState.availableVersion = version || null;
+  updateState.downloadInProgress = true;
+  updateState.downloaded = false;
+  container.style.display = "block";
+}
+
+function showUpdateDownloadedBanner(version) {
+  const container = ensureUpdateBanner();
+  const textEl = document.getElementById("updateBannerText");
+  const primaryBtn = document.getElementById("updateBannerPrimaryBtn");
+  const secondaryBtn = document.getElementById("updateBannerSecondaryBtn");
+  if (!container || !textEl || !primaryBtn || !secondaryBtn) return;
+
+  textEl.textContent = version
+    ? `Aggiornamento scaricato (${version}). Riavvia per applicare l'aggiornamento.`
+    : "Aggiornamento scaricato. Riavvia per applicare l'aggiornamento.";
+  primaryBtn.textContent = "Riavvia e aggiorna";
+  primaryBtn.disabled = false;
+  secondaryBtn.textContent = "Più tardi";
+  secondaryBtn.disabled = false;
+
+  updateState.downloadInProgress = false;
+  updateState.downloaded = true;
+  container.style.display = "block";
+}
+
+function setupUpdateListeners() {
+  if (!window.posizionamenti) return;
+
+  if (window.posizionamenti.onUpdateStatus) {
+    window.posizionamenti.onUpdateStatus((payload) => {
+      if (!payload || payload.status !== "checking") return;
+      showUpdateStatusBanner("Ricerca aggiornamenti in corso...");
+    });
+  }
+
+  if (window.posizionamenti.onUpdateAvailable) {
+    window.posizionamenti.onUpdateAvailable((payload) => {
+      showUpdateAvailableBanner(payload && payload.version ? payload.version : null);
+    });
+  }
+
+  if (window.posizionamenti.onUpdateNotAvailable) {
+    window.posizionamenti.onUpdateNotAvailable(() => {
+      showUpdateStatusBanner("Non sono disponibili nuovi aggiornamenti.");
+    });
+  }
+
+  if (window.posizionamenti.onUpdateDownloaded) {
+    window.posizionamenti.onUpdateDownloaded((payload) => {
+      showUpdateDownloadedBanner(payload && payload.version ? payload.version : null);
+    });
+  }
 }
 
 function setStatus(text) {
@@ -945,5 +1141,10 @@ if (settingsBackdrop) {
 // Carica config, impostazioni utente e clienti/gruppi all'avvio
 Promise.all([loadConfig(), loadUserSettings()]).finally(() => {
   loadClients();
+  setupUpdateListeners();
+  if (window.posizionamenti && window.posizionamenti.checkForUpdates) {
+    // Esegue un primo controllo aggiornamenti all'avvio.
+    void window.posizionamenti.checkForUpdates();
+  }
 });
 

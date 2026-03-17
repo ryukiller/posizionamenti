@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -24,6 +25,7 @@ let mainWindow;
 let orchestrator;
 let configCache;
 let userSettingsCache;
+let updateCheckInProgress = false;
 
 function pathExists(p) {
   try {
@@ -502,6 +504,86 @@ function setupIpc() {
       return { success: false, error: message };
     }
   });
+
+  ipcMain.handle("update:check", async () => {
+    if (updateCheckInProgress) {
+      return { success: false, error: "Controllo aggiornamenti già in corso." };
+    }
+    try {
+      updateCheckInProgress = true;
+      await autoUpdater.checkForUpdates();
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendLog(`Errore controllando aggiornamenti: ${message}`);
+      return { success: false, error: message };
+    } finally {
+      updateCheckInProgress = false;
+    }
+  });
+
+  ipcMain.handle("update:install", async () => {
+    try {
+      autoUpdater.quitAndInstall();
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendLog(`Errore installando aggiornamento: ${message}`);
+      return { success: false, error: message };
+    }
+  });
+}
+
+function setupAutoUpdater() {
+  try {
+    autoUpdater.autoDownload = true;
+
+    autoUpdater.on("checking-for-update", () => {
+      if (mainWindow) {
+        mainWindow.webContents.send("update:status", {
+          status: "checking",
+        });
+      }
+    });
+
+    autoUpdater.on("update-available", (info) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("update:available", {
+          version: info && info.version ? info.version : null,
+        });
+      }
+    });
+
+    autoUpdater.on("update-not-available", (info) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("update:not-available", {
+          version: info && info.version ? info.version : null,
+        });
+      }
+    });
+
+    autoUpdater.on("download-progress", (progress) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("update:download-progress", {
+          percent: progress && typeof progress.percent === "number" ? progress.percent : 0,
+        });
+      }
+    });
+
+    autoUpdater.on("update-downloaded", (info) => {
+      if (mainWindow) {
+        mainWindow.webContents.send("update:downloaded", {
+          version: info && info.version ? info.version : null,
+        });
+      }
+    });
+  } catch (error) {
+    // Do not crash the app if auto-updater fails to initialize.
+    sendLog(
+      `Auto-updater non inizializzato: ${error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 function downloadToBuffer(url) {
@@ -616,6 +698,7 @@ app.whenReady().then(() => {
   try {
     setupCore();
     setupIpc();
+    setupAutoUpdater();
     createWindow();
 
     app.on("activate", () => {

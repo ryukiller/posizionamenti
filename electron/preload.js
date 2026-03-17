@@ -41,5 +41,38 @@ contextBridge.exposeInMainWorld("posizionamenti", {
     const result = await ipcRenderer.invoke("scan:choose-profile-dir");
     return result;
   },
+  async checkForUpdates() {
+    const result = await ipcRenderer.invoke("update:check");
+    return result;
+  },
+  async installUpdate() {
+    const result = await ipcRenderer.invoke("update:install");
+    return result;
+  },
+  onUpdateStatus(callback) {
+    ipcRenderer.on("update:status", (_event, payload) => {
+      callback(payload);
+    });
+  },
+  onUpdateAvailable(callback) {
+    ipcRenderer.on("update:available", (_event, payload) => {
+      callback(payload);
+    });
+  },
+  onUpdateNotAvailable(callback) {
+    ipcRenderer.on("update:not-available", (_event, payload) => {
+      callback(payload);
+    });
+  },
+  onUpdateDownloadProgress(callback) {
+    ipcRenderer.on("update:download-progress", (_event, payload) => {
+      callback(payload);
+    });
+  },
+  onUpdateDownloaded(callback) {
+    ipcRenderer.on("update:downloaded", (_event, payload) => {
+      callback(payload);
+    });
+  },
 });
 

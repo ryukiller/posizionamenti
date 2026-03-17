@@ -41,11 +41,13 @@ jobs:
           NODE_ENV: production
         run: npm run electron:build
 
-      - name: Upload macOS dmg
+      - name: Upload macOS dmg and update metadata
         uses: actions/upload-artifact@v4
         with:
           name: posizionamenti-macOS
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*-mac.yml
           if-no-files-found: error
 
   build_windows:
@@ -80,11 +82,13 @@ jobs:
           NODE_ENV: production
         run: npm run electron:build
 
-      - name: Upload Windows installer
+      - name: Upload Windows installer and update metadata
         uses: actions/upload-artifact@v4
         with:
           name: posizionamenti-Windows
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/latest.yml
           if-no-files-found: error
 
   create_release:

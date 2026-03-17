@@ -10,6 +10,9 @@
     "dev:cli:loop": "ts-node src/cli.ts run-loop",
     "electron:dev": "npm run build && electron electron/main.js",
     "electron:build": "npm run build && electron-builder --publish=never",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -17,12 +20,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "archiver": "^7.0.1",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
+    "electron-updater": "^6.3.9",
     "form-data": "^4.0.5",
     "playwright": "^1.58.2",
-    "yargs": "^18.0.0",
-    "archiver": "^7.0.1"
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
@@ -47,6 +51,13 @@
     "win": {
       "target": "nsis",
       "icon": "electron/assets/icon.ico"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ryukiller",
+        "repo": "posizionamenti"
+      }
+    ]
   }
 }
