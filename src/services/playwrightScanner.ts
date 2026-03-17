@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { app } from "electron";
 import {
   chromium,
   firefox,
@@ -65,10 +66,12 @@ export class PlaywrightScanner implements Scanner {
   private readonly headless: boolean;
 
   constructor(options: PlaywrightScannerOptions = {}) {
+    const defaultScreenshotsBase =
+      (app && app.getPath("userData")) || process.cwd();
     this.screenshotsDir =
       options.screenshotsDir ||
       process.env.SCREENSHOTS_DIR ||
-      path.resolve(process.cwd(), "screenshots");
+      path.join(defaultScreenshotsBase, "screenshots");
     this.googleCountry =
       options.googleCountry || process.env.GOOGLE_COUNTRY || "it";
     this.googleLang = options.googleLang || process.env.GOOGLE_LANG || "it";
