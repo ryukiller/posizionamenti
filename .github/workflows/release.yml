@@ -47,6 +47,7 @@ jobs:
           name: posizionamenti-macOS
           path: |
             dist/*.dmg
+            dist/*.zip
             dist/*-mac.yml
           if-no-files-found: error
 

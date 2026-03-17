@@ -45,7 +45,10 @@
       "package.json"
     ],
     "mac": {
-      "target": "dmg",
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "electron/assets/icon.icns"
     },
     "win": {

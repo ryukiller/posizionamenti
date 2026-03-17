@@ -577,6 +577,11 @@ function setupAutoUpdater() {
         });
       }
     });
+
+    autoUpdater.on("error", (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      sendLog(`Errore auto-updater: ${message}`);
+    });
   } catch (error) {
     // Do not crash the app if auto-updater fails to initialize.
     sendLog(
