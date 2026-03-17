@@ -1,33 +1,41 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
-const { autoUpdater } = require("electron-updater");
-const path = require("path");
-const fs = require("fs");
-const os = require("os");
-const https = require("https");
-const http = require("http");
-const archiver = require("archiver");
-const { loadUserSettings, saveUserSettings } = require("./userSettings");
+import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import { autoUpdater } from "electron-updater";
+import path from "path";
+import fs from "fs";
+import os from "os";
+import https from "https";
+import http from "http";
+import archiver from "archiver";
 
 // Core Posizionamenti (compilato da src/ in dist/)
-const { loadConfig } = require("../dist/config");
-const { ScanOrchestrator } = require("../dist/services/scanOrchestrator");
-const { StubScanner } = require("../dist/services/scanner");
+// Il bundle main è in out/main/, quindi puntiamo a ../../dist/**
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { loadConfig } = require("../../dist/config");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ScanOrchestrator } = require("../../dist/services/scanOrchestrator");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { StubScanner } = require("../../dist/services/scanner");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { PlaywrightScanner } = require("../../dist/services/playwrightScanner");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { HttpClient } = require("../../dist/http/client");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ScanTargetsApi } = require("../../dist/http/scanTargetsApi");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { ScanResultsViewApi } = require("../../dist/http/scanResultsViewApi");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const {
-  PlaywrightScanner,
-} = require("../dist/services/playwrightScanner");
-const { HttpClient } = require("../dist/http/client");
-const { ScanTargetsApi } = require("../dist/http/scanTargetsApi");
-const {
-  ScanResultsViewApi,
-} = require("../dist/http/scanResultsViewApi");
+  loadUserSettings,
+  saveUserSettings,
+} = require("../../electron_old/userSettings");
 
-let mainWindow;
-let orchestrator;
-let configCache;
-let userSettingsCache;
+let mainWindow: BrowserWindow | null = null;
+let orchestrator: any;
+let configCache: any;
+let userSettingsCache: any;
 let updateCheckInProgress = false;
 
-function pathExists(p) {
+function pathExists(p: string): boolean {
   try {
     return fs.existsSync(p);
   } catch {
@@ -35,15 +43,11 @@ function pathExists(p) {
   }
 }
 
-function isChromiumUserDataDirLocked(userDataDir) {
-  // Chromium creates a SingletonLock file in the user-data-dir when running.
-  // If it exists, attempting to launch another persistent context will fail.
-  if (!userDataDir) return false;
-  const lockPath = path.join(userDataDir, "SingletonLock");
-  return pathExists(lockPath);
-}
-
-function copyDirRecursive(srcDir, destDir, shouldSkip) {
+function copyDirRecursive(
+  srcDir: string,
+  destDir: string,
+  shouldSkip?: (srcPath: string, entry: fs.Dirent) => boolean,
+): void {
   if (!pathExists(srcDir)) return;
   fs.mkdirSync(destDir, { recursive: true });
 
@@ -68,10 +72,11 @@ function copyDirRecursive(srcDir, destDir, shouldSkip) {
   }
 }
 
-function ensureScannerChromiumProfile({ sourceUserDataDir, appProfileRootDir }) {
-  // Create an app-managed Chromium user-data-dir that can be used even when
-  // the real browser profile is open. We copy the Default profile and Local State
-  // best-effort (excluding caches) to retain cookies/logins as much as possible.
+function ensureScannerChromiumProfile(params: {
+  sourceUserDataDir: string | null;
+  appProfileRootDir: string | null;
+}): string | null {
+  const { sourceUserDataDir, appProfileRootDir } = params;
   if (!sourceUserDataDir || !appProfileRootDir) return null;
   if (!pathExists(sourceUserDataDir)) return null;
 
@@ -81,7 +86,6 @@ function ensureScannerChromiumProfile({ sourceUserDataDir, appProfileRootDir }) 
 
   fs.mkdirSync(destUserDataDir, { recursive: true });
 
-  // Copy "Local State" (important for profile encryption metadata on some platforms)
   try {
     const localStateSrc = path.join(sourceUserDataDir, "Local State");
     const localStateDest = path.join(destUserDataDir, "Local State");
@@ -92,11 +96,12 @@ function ensureScannerChromiumProfile({ sourceUserDataDir, appProfileRootDir }) 
     // ignore
   }
 
-  // Copy Default profile folder once (or refresh missing pieces)
-  if (pathExists(sourceDefaultProfileDir) && !pathExists(destDefaultProfileDir)) {
-    const skip = (srcPath, entry) => {
+  if (
+    pathExists(sourceDefaultProfileDir) &&
+    !pathExists(destDefaultProfileDir)
+  ) {
+    const skip = (_srcPath: string, entry: fs.Dirent) => {
       const name = entry.name;
-      // Skip large volatile caches; keep cookies, preferences, storage.
       const cacheDirs = new Set([
         "Cache",
         "Code Cache",
@@ -108,11 +113,9 @@ function ensureScannerChromiumProfile({ sourceUserDataDir, appProfileRootDir }) 
         "OptimizationGuidePredictionModels",
       ]);
       if (entry.isDirectory() && cacheDirs.has(name)) return true;
-      // Skip crash dumps if present
       if (entry.isDirectory() && name === "Crashpad") return true;
-      // Some lock/temp files
-      if (entry.isFile() && (name === "LOCK" || name === "SingletonLock")) return true;
-      // Skip huge history journals if locked; best-effort handled by copyFileSync try/catch
+      if (entry.isFile() && (name === "LOCK" || name === "SingletonLock"))
+        return true;
       return false;
     };
     copyDirRecursive(sourceDefaultProfileDir, destDefaultProfileDir, skip);
@@ -121,7 +124,9 @@ function ensureScannerChromiumProfile({ sourceUserDataDir, appProfileRootDir }) 
   return destUserDataDir;
 }
 
-function guessBrowserUserDataDir(browser) {
+function guessBrowserUserDataDir(
+  browser: string | null | undefined,
+): string | null {
   const home = os.homedir();
   const platform = process.platform;
 
@@ -129,10 +134,8 @@ function guessBrowserUserDataDir(browser) {
     return null;
   }
 
-  // Chromium-family (Chrome / Edge / Chromium)
   if (browser === "chrome" || browser === "chromium") {
     if (platform === "darwin") {
-      // macOS Chrome
       return path.join(
         home,
         "Library",
@@ -142,18 +145,10 @@ function guessBrowserUserDataDir(browser) {
       );
     }
     if (platform === "win32") {
-      // Windows Chrome
       const localAppData =
-        process.env.LOCALAPPDATA ||
-        path.join(home, "AppData", "Local");
-      return path.join(
-        localAppData,
-        "Google",
-        "Chrome",
-        "User Data",
-      );
+        process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+      return path.join(localAppData, "Google", "Chrome", "User Data");
     }
-    // Linux (best-effort)
     if (platform === "linux") {
       return path.join(
         home,
@@ -174,14 +169,8 @@ function guessBrowserUserDataDir(browser) {
     }
     if (platform === "win32") {
       const localAppData =
-        process.env.LOCALAPPDATA ||
-        path.join(home, "AppData", "Local");
-      return path.join(
-        localAppData,
-        "Microsoft",
-        "Edge",
-        "User Data",
-      );
+        process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+      return path.join(localAppData, "Microsoft", "Edge", "User Data");
     }
     if (platform === "linux") {
       return path.join(home, ".config", "microsoft-edge");
@@ -200,8 +189,7 @@ function guessBrowserUserDataDir(browser) {
     }
     if (platform === "win32") {
       const appData =
-        process.env.APPDATA ||
-        path.join(home, "AppData", "Roaming");
+        process.env.APPDATA || path.join(home, "AppData", "Roaming");
       return path.join(appData, "Mozilla", "Firefox", "Profiles");
     }
     if (platform === "linux") {
@@ -212,14 +200,12 @@ function guessBrowserUserDataDir(browser) {
   return null;
 }
 
-// Proxy console output to the renderer log UI as well,
-// so that scan steps are visible in the desktop app.
 const originalConsoleInfo = console.info.bind(console);
 const originalConsoleError = console.error.bind(console);
 const originalConsoleWarn = console.warn.bind(console);
 const originalConsoleLog = console.log.bind(console);
 
-function forwardToLog(level, args) {
+function forwardToLog(level: string, args: unknown[]): void {
   const message = `[${level}] ${args
     .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
     .join(" ")}`;
@@ -228,44 +214,55 @@ function forwardToLog(level, args) {
   }
 }
 
-console.info = (...args) => {
+console.info = (...args: unknown[]) => {
   originalConsoleInfo(...args);
   forwardToLog("info", args);
 };
 
-console.error = (...args) => {
+console.error = (...args: unknown[]) => {
   originalConsoleError(...args);
   forwardToLog("error", args);
 };
 
-console.warn = (...args) => {
+console.warn = (...args: unknown[]) => {
   originalConsoleWarn(...args);
   forwardToLog("warn", args);
 };
 
-console.log = (...args) => {
+console.log = (...args: unknown[]) => {
   originalConsoleLog(...args);
   forwardToLog("log", args);
 };
 
-function createWindow() {
+function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1000,
     height: 700,
     icon: path.join(__dirname, "assets", "icon.png"),
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      // In dev/build, electron-vite outputs the preload bundle to out/preload/preload.js
+      // __dirname here is out/main, so we need to go up one level.
+      preload: path.join(__dirname, "..", "preload", "preload.js"),
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  const devUrl = process.env.ELECTRON_RENDERER_URL;
+  if (devUrl) {
+    void mainWindow.loadURL(devUrl);
+  } else {
+    const fileUrl = new URL(
+      "../renderer/index.html",
+      `file://${path.join(__dirname, "..", "renderer")}/`,
+    ).toString();
+    void mainWindow.loadURL(fileUrl);
+  }
 
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
 
-function setupCore() {
+function applyUserSettingsToConfig(): void {
   if (!configCache) {
     configCache = loadConfig();
   }
@@ -273,8 +270,6 @@ function setupCore() {
     userSettingsCache = loadUserSettings();
   }
   if (userSettingsCache) {
-    // Allow overriding backend config from UI settings so the packaged app
-    // does not depend on environment variables.
     if (userSettingsCache.backendBaseUrl) {
       configCache.swiBaseUrl = userSettingsCache.backendBaseUrl;
     }
@@ -282,43 +277,43 @@ function setupCore() {
       configCache.apiKey = userSettingsCache.apiKey;
     }
   }
+}
+
+function setupCore(): void {
+  applyUserSettingsToConfig();
   const usePlaywright =
     process.env.SCANNER_ENGINE === "playwright" ||
     process.env.NODE_ENV === "production";
-  const scannerOptions = {};
+  const scannerOptions: any = {};
   if (userSettingsCache) {
-    const browser = userSettingsCache.browser;
-    const browserKey = browser && browser !== "system-default" ? browser : "chromium";
+    const browser = userSettingsCache.browser as string | null | undefined;
+    const browserKey =
+      browser && browser !== "system-default" ? browser : "chromium";
 
-    // Map user-friendly browser choice to engine + channel
     if (browserKey === "firefox") {
       scannerOptions.browserEngine = "firefox";
     } else if (browserKey === "chromium") {
       scannerOptions.browserEngine = "chromium";
     } else {
-      // chrome / msedge -> chromium engine with specific channel
       scannerOptions.browserEngine = "chromium";
       scannerOptions.browserChannel =
-        browserKey === "chrome" || browserKey === "msedge" ? browserKey : undefined;
+        browserKey === "chrome" || browserKey === "msedge"
+          ? browserKey
+          : undefined;
     }
 
-    // Always use an app-owned profile directory; never point directly at the real browser profile
     const appProfilesBase = path.join(app.getPath("userData"), "profiles");
     const appProfileDir = path.join(appProfilesBase, browserKey);
-    // Start from a clean profile directory each time we (re)create the scanner
     try {
       if (fs.existsSync(appProfileDir)) {
         fs.rmSync(appProfileDir, { recursive: true, force: true });
       }
     } catch {
-      // ignore cleanup errors; directory will be recreated below if needed
+      // ignore cleanup errors
     }
     fs.mkdirSync(appProfileDir, { recursive: true });
     scannerOptions.userDataDir = appProfileDir;
 
-    if (browser && browser !== "system-default") {
-      // already mapped above
-    }
     if (typeof userSettingsCache.headless === "boolean") {
       scannerOptions.headless = !userSettingsCache.headless ? false : true;
     }
@@ -329,11 +324,15 @@ function setupCore() {
   orchestrator = new ScanOrchestrator(configCache, scanner);
 }
 
-function setupIpc() {
+function sendLog(message: string): void {
+  if (mainWindow) {
+    mainWindow.webContents.send("scan:log", message);
+  }
+}
+
+function setupIpc(): void {
   ipcMain.handle("scan:get-config", async () => {
-    if (!configCache) {
-      configCache = loadConfig();
-    }
+    applyUserSettingsToConfig();
     return {
       swiBaseUrl: configCache.swiBaseUrl,
     };
@@ -350,7 +349,9 @@ function setupIpc() {
     try {
       const merged = saveUserSettings(partial || {});
       userSettingsCache = merged;
-      // Force re-create scanner/orchestrator on next run with new settings.
+      // aggiorna anche la config corrente così il nuovo backend/API key
+      // vengono usati immediatamente senza riavviare l'app
+      applyUserSettingsToConfig();
       orchestrator = null;
       return { success: true };
     } catch (error) {
@@ -395,14 +396,12 @@ function setupIpc() {
 
   ipcMain.handle("scan:get-clients-with-groups", async () => {
     try {
-      if (!configCache) {
-        configCache = loadConfig();
-      }
+      applyUserSettingsToConfig();
       const httpClient = new HttpClient({ config: configCache });
       const scanTargetsApi = new ScanTargetsApi(httpClient);
       const response = await scanTargetsApi.fetchScanTargets();
 
-      const clientsById = new Map();
+      const clientsById = new Map<string, any>();
 
       for (const target of response.targets) {
         try {
@@ -420,7 +419,7 @@ function setupIpc() {
 
           const clientEntry = clientsById.get(cid);
           const exists = clientEntry.groups.some(
-            (g) => g.keywordGroupId === target.keywordGroupId,
+            (g: any) => g.keywordGroupId === target.keywordGroupId,
           );
           if (!exists) {
             clientEntry.groups.push({
@@ -433,8 +432,6 @@ function setupIpc() {
             });
           }
         } catch (itemError) {
-          // Skip malformed target entries instead of failing the whole list.
-          // eslint-disable-next-line no-console
           console.warn(
             "Skipping malformed scan target while building clients list:",
             itemError,
@@ -455,9 +452,7 @@ function setupIpc() {
 
   ipcMain.handle("scan:get-results", async (_event, options) => {
     try {
-      if (!configCache) {
-        configCache = loadConfig();
-      }
+      applyUserSettingsToConfig();
       const httpClient = new HttpClient({ config: configCache });
       const scanResultsApi = new ScanResultsViewApi(httpClient);
       const query = {
@@ -466,7 +461,11 @@ function setupIpc() {
         keywordGroupId: options?.keywordGroupId ?? null,
       };
       const response = await scanResultsApi.fetchScanResults(query);
-      return { success: true, results: response.results, count: response.count };
+      return {
+        success: true,
+        results: response.results,
+        count: response.count,
+      };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       sendLog(`Errore caricando risultati da /api/scan-results: ${message}`);
@@ -479,7 +478,7 @@ function setupIpc() {
       title: "Salva batch come ZIP",
       defaultPath: path.join(
         os.homedir(),
-        "scan-batch-" + new Date().toISOString().slice(0, 16).replace(/:/g, "-") + ".zip",
+        `scan-batch-${new Date().toISOString().slice(0, 16).replace(/:/g, "-")}.zip`,
       ),
       filters: [{ name: "File ZIP", extensions: ["zip"] }],
     });
@@ -500,28 +499,30 @@ function setupIpc() {
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      sendLog(`Errore creando ZIP per batch ${batchId || "sconosciuto"}: ${message}`);
+      sendLog(
+        `Errore creando ZIP per batch ${batchId || "sconosciuto"}: ${message}`,
+      );
       return { success: false, error: message };
     }
   });
 
   ipcMain.handle("update:check", async () => {
-    // On macOS we don't use automatic in-app updates, since that
-    // requires paid Apple Developer signing. Instead, open the
-    // GitHub Releases page so the user can download manually.
     if (process.platform === "darwin") {
       try {
         const releasesUrl =
           "https://github.com/ryukiller/posizionamenti/releases/latest";
-        await shell.openExternal(releasesUrl);
         sendLog(
-          "Aggiornamenti macOS: apertura pagina GitHub Releases per scaricare la nuova versione.",
+          "Aggiornamenti macOS: link GitHub Releases disponibile per scaricare la nuova versione.",
         );
-        return { success: true, urlOpened: true };
+        return {
+          success: true,
+          platform: "darwin",
+          releasesUrl,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         sendLog(
-          `Errore aprendo la pagina GitHub Releases per aggiornamento macOS: ${message}`,
+          `Errore preparando il link GitHub Releases per aggiornamento macOS: ${message}`,
         );
         return { success: false, error: message };
       }
@@ -555,7 +556,158 @@ function setupIpc() {
   });
 }
 
-function setupAutoUpdater() {
+function downloadToBuffer(url: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith("https") ? https : http;
+    client
+      .get(url, (res) => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} scaricando ${url}`));
+          return;
+        }
+        const data: Buffer[] = [];
+        res.on("data", (chunk) => data.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(data)));
+      })
+      .on("error", (err) => reject(err));
+  });
+}
+
+async function createBatchZip(params: {
+  outputPath: string;
+  batchId?: string;
+  results: any[];
+}): Promise<void> {
+  const { outputPath, batchId, results } = params;
+  await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
+
+  const output = fs.createWriteStream(outputPath);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  const archivePromise = new Promise<void>((resolve, reject) => {
+    output.on("close", () => resolve());
+    output.on("error", (err) => reject(err));
+    archive.on("error", (err) => reject(err));
+  });
+
+  archive.pipe(output);
+
+  const headers = [
+    "keyword",
+    "searchedDomain",
+    "position",
+    "foundUrl",
+    "serpUrl",
+    "screenshotUrl",
+    "runAt",
+  ];
+
+  const csvLines: string[] = [headers.join(",")];
+
+  for (let index = 0; index < results.length; index += 1) {
+    const r = results[index];
+    const screenshotUrlFull = r.screenshotUrlResolved || r.screenshotUrl || "";
+    const csvRow = [
+      r.keyword ?? "",
+      r.searchedDomain ?? "",
+      r.position ?? "",
+      r.foundUrl ?? "",
+      r.serpUrl ?? "",
+      screenshotUrlFull,
+      r.runAt ?? "",
+    ]
+      .map((value) => {
+        const str = String(value);
+        if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      })
+      .join(",");
+    csvLines.push(csvRow);
+
+    if (screenshotUrlFull) {
+      try {
+        const buffer = await downloadToBuffer(screenshotUrlFull);
+        const safeKeyword = (r.keyword || "keyword")
+          .toString()
+          .replace(/[^a-z0-9-_]+/gi, "_");
+        const filename = `screenshots/${String(index + 1).padStart(
+          3,
+          "0",
+        )}-${safeKeyword}.png`;
+        archive.append(buffer, { name: filename });
+      } catch (err) {
+        sendLog(
+          `Impossibile scaricare screenshot per batch ${
+            batchId || "sconosciuto"
+          } (${screenshotUrlFull}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+  }
+
+  const csvContent = csvLines.join("\n");
+  archive.append(csvContent, { name: "results.csv" });
+
+  await archive.finalize();
+  await archivePromise;
+}
+
+function logStartupError(error: unknown): void {
+  try {
+    const userDataDir = app.getPath("userData");
+    const logFile = path.join(userDataDir, "startup-error.log");
+    const message =
+      `[${new Date().toISOString()}] ` +
+      (error instanceof Error
+        ? `${error.name}: ${error.message}\n${error.stack || ""}`
+        : String(error));
+    fs.mkdirSync(userDataDir, { recursive: true });
+    fs.appendFileSync(logFile, message + "\n\n");
+  } catch {
+    // ignore
+  }
+}
+
+app.whenReady().then(() => {
+  try {
+    setupCore();
+    setupIpc();
+    setupAutoUpdater();
+    createWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    logStartupError(error);
+    const message =
+      error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+    try {
+      dialog.showErrorBox(
+        "Errore di avvio Posizionamenti",
+        `${message}\n\nControlla il file startup-error.log nella cartella dati dell'applicazione per maggiori dettagli.`,
+      );
+    } finally {
+      app.quit();
+    }
+  }
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+function setupAutoUpdater(): void {
   try {
     autoUpdater.autoDownload = true;
 
@@ -586,7 +738,10 @@ function setupAutoUpdater() {
     autoUpdater.on("download-progress", (progress) => {
       if (mainWindow) {
         mainWindow.webContents.send("update:download-progress", {
-          percent: progress && typeof progress.percent === "number" ? progress.percent : 0,
+          percent:
+            progress && typeof progress.percent === "number"
+              ? progress.percent
+              : 0,
         });
       }
     });
@@ -604,152 +759,10 @@ function setupAutoUpdater() {
       sendLog(`Errore auto-updater: ${message}`);
     });
   } catch (error) {
-    // Do not crash the app if auto-updater fails to initialize.
     sendLog(
-      `Auto-updater non inizializzato: ${error instanceof Error ? error.message : String(error)
+      `Auto-updater non inizializzato: ${
+        error instanceof Error ? error.message : String(error)
       }`,
     );
   }
 }
-
-function downloadToBuffer(url) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith("https") ? https : http;
-    client
-      .get(url, (res) => {
-        if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`HTTP ${res.statusCode} scaricando ${url}`));
-          return;
-        }
-        const data = [];
-        res.on("data", (chunk) => data.push(chunk));
-        res.on("end", () => resolve(Buffer.concat(data)));
-      })
-      .on("error", (err) => reject(err));
-  });
-}
-
-async function createBatchZip({ outputPath, batchId, results }) {
-  await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
-
-  const output = fs.createWriteStream(outputPath);
-  const archive = archiver("zip", { zlib: { level: 9 } });
-
-  const archivePromise = new Promise((resolve, reject) => {
-    output.on("close", resolve);
-    output.on("error", reject);
-    archive.on("error", reject);
-  });
-
-  archive.pipe(output);
-
-  const headers = [
-    "keyword",
-    "searchedDomain",
-    "position",
-    "foundUrl",
-    "serpUrl",
-    "screenshotUrl",
-    "runAt",
-  ];
-
-  const csvLines = [headers.join(",")];
-
-  for (let index = 0; index < results.length; index += 1) {
-    const r = results[index];
-    const screenshotUrlFull =
-      r.screenshotUrlResolved || r.screenshotUrl || "";
-    const csvRow = [
-      r.keyword ?? "",
-      r.searchedDomain ?? "",
-      r.position ?? "",
-      r.foundUrl ?? "",
-      r.serpUrl ?? "",
-      screenshotUrlFull,
-      r.runAt ?? "",
-    ]
-      .map((value) => {
-        const str = String(value);
-        if (str.includes('"') || str.includes(",") || str.includes("\n")) {
-          return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-      })
-      .join(",");
-    csvLines.push(csvRow);
-
-    if (screenshotUrlFull) {
-      try {
-        const buffer = await downloadToBuffer(screenshotUrlFull);
-        const safeKeyword = (r.keyword || "keyword").toString().replace(/[^a-z0-9-_]+/gi, "_");
-        const filename = `screenshots/${String(index + 1).padStart(3, "0")}-${safeKeyword}.png`;
-        archive.append(buffer, { name: filename });
-      } catch (err) {
-        sendLog(
-          `Impossibile scaricare screenshot per batch ${batchId || "sconosciuto"} (${screenshotUrlFull}): ${err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
-    }
-  }
-
-  const csvContent = csvLines.join("\n");
-  archive.append(csvContent, { name: "results.csv" });
-
-  await archive.finalize();
-  await archivePromise;
-}
-
-function sendLog(message) {
-  if (mainWindow) {
-    mainWindow.webContents.send("scan:log", message);
-  }
-}
-
-function logStartupError(error) {
-  try {
-    const userDataDir = app.getPath("userData");
-    const logFile = path.join(userDataDir, "startup-error.log");
-    const message =
-      `[${new Date().toISOString()}] ` +
-      (error instanceof Error ? `${error.name}: ${error.message}\n${error.stack || ""}` : String(error));
-    fs.mkdirSync(userDataDir, { recursive: true });
-    fs.appendFileSync(logFile, message + "\n\n");
-  } catch {
-    // If logging fails, we can't do much else here
-  }
-}
-
-app.whenReady().then(() => {
-  try {
-    setupCore();
-    setupIpc();
-    setupAutoUpdater();
-    createWindow();
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-      }
-    });
-  } catch (error) {
-    logStartupError(error);
-    const message =
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    try {
-      dialog.showErrorBox(
-        "Errore di avvio Posizionamenti",
-        `${message}\n\nControlla il file startup-error.log nella cartella dati dell'applicazione per maggiori dettagli.`,
-      );
-    } finally {
-      app.quit();
-    }
-  }
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
