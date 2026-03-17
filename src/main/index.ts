@@ -23,11 +23,13 @@ const { HttpClient } = require("../../dist/http/client");
 const { ScanTargetsApi } = require("../../dist/http/scanTargetsApi");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ScanResultsViewApi } = require("../../dist/http/scanResultsViewApi");
+// Impostazioni utente (compilate da src/main/ in dist/main/)
+// Il bundle main è in out/main/, quindi puntiamo a ../../dist/main/**
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const {
   loadUserSettings,
   saveUserSettings,
-} = require("../../electron_old/userSettings");
+} = require("../../dist/main/userSettings");
 
 let mainWindow: BrowserWindow | null = null;
 let orchestrator: any;
