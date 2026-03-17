@@ -1,6 +1,6 @@
 {
   "name": "posizionamenti",
-  "version": "1.0.0",
+  "version": "0.0.7",
   "description": "App desktop cross-platform (macOS e Windows) per verificare le posizioni sui motori di ricerca (Google). L'app scarica dalla webapp la lista di clienti/domini/keyword, esegue ricerche in browser visibile con Playwright, rileva la posizione del dominio target nella SERP, salva screenshot annotati e invia i risultati all'API backend.",
   "main": "electron/main.js",
   "scripts": {
@@ -34,17 +34,19 @@
   },
   "build": {
     "appId": "com.swi.posizionamenti",
-    "productName": "Posizionamenti SERP Scanner",
+    "productName": "Posizionamenti",
     "files": [
       "dist/**/*",
       "electron/**/*",
       "package.json"
     ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "electron/assets/icon.icns"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "electron/assets/icon.ico"
     }
   }
 }
