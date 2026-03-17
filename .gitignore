@@ -1,0 +1,31 @@
+# existing
+node_modules
+.env
+*.log
+.DS_Store
+
+# build output
+dist/
+out/
+release/
+build/
+
+# Electron / Playwright / test artifacts (adjust if present)
+playwright-report/
+test-results/
+
+# Local screenshots & large binary artifacts
+screenshots/
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Cursor IDE / agent metadata
+.cursor/
+.agent/
+agent-transcripts/
+terminals/
+
+# OS / misc
+Thumbs.db
