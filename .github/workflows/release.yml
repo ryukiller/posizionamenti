@@ -1,0 +1,111 @@
+name: Build and Release Desktop Apps
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build_mac:
+    name: Build macOS app
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env for build
+        run: |
+          cat > .env << 'EOF'
+          SWI_BASE_URL=${{ secrets.SWI_BASE_URL }}
+          SCAN_APP_API_KEY=${{ secrets.SCAN_APP_API_KEY }}
+          SCANNER_ENGINE=playwright
+          NODE_ENV=production
+          EOF
+
+      - name: Build Electron app (macOS)
+        env:
+          NODE_ENV: production
+        run: npm run electron:build
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: posizionamenti-macOS
+          path: dist/**
+          if-no-files-found: error
+
+  build_windows:
+    name: Build Windows app
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env for build
+        shell: bash
+        run: |
+          cat > .env << 'EOF'
+          SWI_BASE_URL=${{ secrets.SWI_BASE_URL }}
+          SCAN_APP_API_KEY=${{ secrets.SCAN_APP_API_KEY }}
+          SCANNER_ENGINE=playwright
+          NODE_ENV=production
+          EOF
+
+      - name: Build Electron app (Windows)
+        env:
+          NODE_ENV: production
+        run: npm run electron:build
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: posizionamenti-Windows
+          path: dist/**
+          if-no-files-found: error
+
+  create_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - build_mac
+      - build_windows
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display downloaded files
+        run: ls -R
+        working-directory: ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
