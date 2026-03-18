@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import FormData from "form-data";
 import { HttpClient } from "./client";
+import { resolveMaybeRelativeUrl } from "./resolveUrl";
 
 interface UploadScreenshotResponse {
   success: boolean;
@@ -45,6 +46,6 @@ export class UploadScreenshotApi {
       throw new Error("Invalid response from upload-screenshot endpoint");
     }
 
-    return response.url;
+    return resolveMaybeRelativeUrl(this.http.getBaseUrl(), response.url);
   }
 }

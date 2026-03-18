@@ -62,6 +62,10 @@ export class HttpClient {
     }
   }
 
+  getBaseUrl(): string {
+    return this.config.swiBaseUrl;
+  }
+
   private handleError(error: unknown): void {
     if (!axios.isAxiosError(error) || !error.response) {
       return;

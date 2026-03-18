@@ -1,4 +1,5 @@
 import { HttpClient } from "./client";
+import { resolveMaybeRelativeUrl } from "./resolveUrl";
 
 export interface ScanResultsQuery {
   clienteId?: string;
@@ -101,7 +102,9 @@ export class ScanResultsViewApi {
           position: s.position,
           foundUrl: s.foundUrl,
           serpUrl: s.serpUrl,
-          screenshotUrl: s.screenshotUrl ?? null,
+          screenshotUrl: s.screenshotUrl
+            ? resolveMaybeRelativeUrl(this.http.getBaseUrl(), s.screenshotUrl)
+            : null,
           runAt: s.runAt,
         });
       }
