@@ -94,6 +94,7 @@ export function Sidebar({
                         numeroContrattoInterno:
                           group.numeroContrattoInterno ?? undefined,
                         domain: group.domain,
+                        keywords: group.keywords ?? [],
                       })
                     }
                     className={`w-full rounded-md border px-2 py-1 text-left text-[11px] transition-colors ${

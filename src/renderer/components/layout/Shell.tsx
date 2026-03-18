@@ -34,6 +34,15 @@ export function MainHeader({
   selectionSummary,
   themeToggle,
 }: HeaderProps) {
+  const keywords = selectedGroup?.keywords ?? [];
+  const maxPreview = 10;
+  const visible = keywords.slice(0, maxPreview);
+  const rest = keywords.length - visible.length;
+  const keywordsPreview =
+    keywords.length === 0
+      ? "Nessuna keyword nel gruppo."
+      : `${visible.join(", ")}${rest > 0 ? ` … (+${rest})` : ""}`;
+
   return (
     <div className="border-b border-slate-800 px-5 py-3 flex items-center justify-between gap-4">
       <div>
@@ -51,6 +60,11 @@ export function MainHeader({
               ? `Gruppo selezionato: ${selectedGroup.clientName} → ${selectedGroup.keywordGroupName}`
               : "Nessun gruppo selezionato.")}
         </p>
+        {selectedGroup && (
+          <p className="mt-0.5 text-xs text-slate-400 line-clamp-2">
+            Keyword: <span className="text-slate-300">{keywordsPreview}</span>
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-2">{themeToggle}</div>
     </div>

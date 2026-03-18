@@ -24,6 +24,7 @@ export interface SelectedGroup {
   contrattoId?: string;
   numeroContrattoInterno?: string;
   domain: string;
+  keywords?: string[];
 }
 
 export function useClients() {
